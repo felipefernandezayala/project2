@@ -4,10 +4,13 @@
 #include <fstream>
 #include <regex>
 #include <string>
+#include <iostream>
+#include <unistd.h>
 
 namespace LinuxParser {
 // Paths
 const std::string kProcDirectory{"/proc/"};
+const std::string kProcStatFilename{"/proc/stat"};
 const std::string kCmdlineFilename{"/cmdline"};
 const std::string kCpuinfoFilename{"/cpuinfo"};
 const std::string kStatusFilename{"/status"};
@@ -41,6 +44,7 @@ enum CPUStates {
   kGuestNice_
 };
 std::vector<std::string> CpuUtilization();
+float CpuUtilization(const int &pid);
 long Jiffies();
 long ActiveJiffies();
 long ActiveJiffies(int pid);
@@ -54,4 +58,15 @@ std::string User(int pid);
 long int UpTime(int pid);
 };  // namespace LinuxParser
 
+
+// helper functions to get a float or int value from a string line st. myKey myValue
+bool getFloatValue(const std::string &line, const std::string &myKey, float &myValue);
+bool getIntValue(const std::string &line, const std::string &myKey, int &myValue);
+// helper function to read an specific key value
+std::string readStringFromFile(const std::string myFile,const std::string myKey);
+int readIntFromFile(const std::string myFile,const std::string myKey);
+// helper to read a number from a file at location myInt
+long readNumberAt(const std::string &myFile, const int &myInt);
+// helper function to get a string  value from a string line st. myKey value
+bool getStringValue(const std::string &line, const std::string &myKey, std::string& value);
 #endif
