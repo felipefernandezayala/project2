@@ -16,7 +16,7 @@ using std::vector;
 string LinuxParser::OperatingSystem() {
   string line;
   string key;
-  string value;
+  string value="Operating System";
   std::ifstream filestream(kOSPath);
   if (filestream.is_open()) {
     while (std::getline(filestream, line)) {
@@ -27,11 +27,13 @@ string LinuxParser::OperatingSystem() {
       while (linestream >> key >> value) {
         if (key == "PRETTY_NAME") {
           std::replace(value.begin(), value.end(), '_', ' ');
+          filestream.close();
           return value;
         }
       }
     }
   }
+  filestream.close();
   return value;
 }
 
@@ -45,6 +47,7 @@ string LinuxParser::Kernel() {
     std::istringstream linestream(line);
     linestream >> os >> version >> kernel;
   }
+  stream.close();
   return kernel;
 }
 
@@ -78,7 +81,6 @@ bool getFloatValue(const string &line, const string &myKey, float& myValue) {
     if (key == myKey) {
       myValue = stof(value);
       foundValue = true;
-      // std::cout<<"memTotal:" << myValue <<std::endl;
       return foundValue;
     }
   }
@@ -93,7 +95,6 @@ bool getStringValue(const string &line, const string &myKey, string& value) {
   while (linestream >> key >> value) {
     if (key == myKey) {
       foundValue = true;
-      //std::cout<< myKey<<"  " << value <<std::endl;
       return true;
     }
   }
@@ -106,8 +107,23 @@ bool getIntValue(const string &line, const string &myKey, int& myValue) {
   string value;
   bool foundValue = getStringValue(line, myKey, value);
   myValue = stoi(value);
-  //std::cout<< myKey<<"  " << value<< "  "<< myValue <<std::endl;
   return foundValue;
+}
+
+// helper function to check string has numbers and is not empty and has no weird characters
+long getLong(const string& myString) {
+    
+    
+    try{
+    long myFloat =stol(myString);
+    return myFloat;
+    }
+    
+    catch(const std::invalid_argument&)
+    {
+      return 0;
+    }
+
 }
 
 // Read and return the system memory utilization
@@ -122,23 +138,21 @@ float LinuxParser::MemoryUtilization() {
 
   // read the important data and store it     
   if (filestream.is_open()) {
-    // std::cout<<"memory file is opened"<<std::endl;
     while (std::getline(filestream, line)) {
-      if (getFloatValue(line, "MemTotal:", memTotal)) {
+      if (getFloatValue(line, filterMemTotalString, memTotal)) {
         bMemTotal = true;
       }
 
-      if (getFloatValue(line, "MemFree:", memFree)) {
+      if (getFloatValue(line, filterMemFreeString, memFree)) {
         bMemFree = true;
       }
-
-      if (getFloatValue(line, "MemAvailable:", memAvailable)) {
+      if (getFloatValue(line, filterMemAvailable, memAvailable)) {
         bMemAvailable = true;
       }
-      if (getFloatValue(line, "Buffers:", buffers)) {
+      if (getFloatValue(line, filterBuffers, buffers)) {
         bBuffers = true;
       }
-      if (getFloatValue(line, "Cached:", cached)) {
+      if (getFloatValue(line, filterCached, cached)) {
         bCached = true;
       }
     }
@@ -163,6 +177,7 @@ float LinuxParser::MemoryUtilization() {
 
   // my formula
   float usage = (memTotal - memFree - buffers - cached) / (memTotal - memFree);
+  filestream.close();
   return usage;
 }
 
@@ -173,7 +188,6 @@ long readNumberAt(const std::string &myFile, const int &myInt)
   string upTimeS;
   // read the important data and store it     
   if (filestream.is_open()) {
-    //std::cout<<"uptime file is opened"<<std::endl;
     std::getline(filestream, line);
     std::istringstream linestream(line);
     for(int i=1;i<=myInt;i++)
@@ -181,7 +195,8 @@ long readNumberAt(const std::string &myFile, const int &myInt)
       linestream >> upTimeS;
       }
   }
-  return stol(upTimeS);
+  filestream.close();
+  return getLong(upTimeS);
 }
 
 // Read and return the system uptime
@@ -206,12 +221,12 @@ long LinuxParser::Jiffies() {
   // formulas take from :
   // https://stackoverflow.com/questions/23367857/accurate-calculation-of-cpu-usage-given-in-percentage-in-linux
   long usertime = LinuxParser::ActiveJiffies();  // usertime - guest
-  long nicetime = stol(output[1]) - stol(output[9]);  // nicetime - guestnice
-  long idlealltime =  LinuxParser::IdleJiffies(); //stol(output[3]) + stol(output[4]);  // idletime + ioWait;
-  long systemalltime = stol(output[2]) + stol(output[5]) +
-                                stol(output[6]);  // systemtime + irq + softIrq;
-  long virtalltime =  stol(output[8]) + stol(output[9]);  // guest + guestnice;
-  long totaltime = usertime + nicetime + systemalltime + idlealltime +  stol(output[7]) + virtalltime;  // usertime + nicetime + systemalltime
+  long nicetime = getLong(output[1]) - getLong(output[9]);  // nicetime - guestnice
+  long idlealltime =  LinuxParser::IdleJiffies();  // idletime + ioWait;
+  long systemalltime = getLong(output[2]) + getLong(output[5]) +
+                                getLong(output[6]);  // systemtime + irq + softIrq;
+  long virtalltime =  getLong(output[8]) + getLong(output[9]);  // guest + guestnice;
+  long totaltime = usertime + nicetime + systemalltime + idlealltime +  getLong(output[7]) + virtalltime;  // usertime + nicetime + systemalltime
                                           // + idlealltime + steal + virtalltime;
 
   return totaltime;
@@ -241,7 +256,7 @@ long LinuxParser::ActiveJiffies(int pid ) {
 long LinuxParser::ActiveJiffies() { 
   // usertime - guest
   vector<string>output =  LinuxParser::CpuUtilization();
-  return stol(output[0]) - stol(output[8]); 
+  return getLong(output[0]) - getLong(output[8]); 
   }
 
 // Read and return the number of idle jiffies for the system
@@ -249,7 +264,7 @@ long LinuxParser::IdleJiffies() {
   //output[3] idle: idle time
   // output[4] iowait: waiting for I/O to complete
   vector<string>myCPUU =  LinuxParser::CpuUtilization();
-  return stol(myCPUU[3]) + stol(myCPUU[4]); 
+  return getLong(myCPUU[3]) + getLong(myCPUU[4]); 
   }
 
 // cpu strings needed to compute utilization
@@ -280,7 +295,6 @@ vector<string> LinuxParser::CpuUtilization()
   string cpus;
   // read the important data and store it     
   if (filestream.is_open()) {
-    //std::cout<<"cpu file is opened"<<std::endl;
     std::getline(filestream, line);
     std::istringstream linestream(line);
     linestream >> cpus;
@@ -297,6 +311,7 @@ vector<string> LinuxParser::CpuUtilization()
   //output[4] iowait: waiting for I/O to complete
   //output[5] irq: servicing interrupts
   //output[6] softirq: servicing softirqs
+  filestream.close();
   return output; 
   }
 
@@ -310,15 +325,15 @@ string readStringFromFile(const string myFile,const string myKey)
 
   // read the important data and store it     
   if (filestream.is_open()) {
-    // std::cout<<"memory file is opened"<<std::endl;
     while (std::getline(filestream, line)) {
       if (getStringValue(line, myKey, myValue)) {
         isRead = true;
+        filestream.close();
         return myValue;
       }
     }
   }
-
+  filestream.close();
   // if data was not read in the file we call an error
   if (!isRead)
     std::cerr << myKey <<" was not read from file "
@@ -336,33 +351,32 @@ int readIntFromFile(const string myFile,const string myKey)
 
   // read the important data and store it     
   if (filestream.is_open()) {
-    //std::cout<<"memory file is opened"<<std::endl;
     while (std::getline(filestream, line)) {
       if (getIntValue(line, myKey, myValue)) {
-        //std::cout<<myKey<<" "<<myValue<<std::endl;
         isRead = true;
+        filestream.close();
         return myValue;
       }
     }
   }
-
+  filestream.close();
   // if data was not read in the file we call an error
   if (!isRead)
     std::cerr << myKey <<" was not read from file "
               << myFile << std::endl;
+  
   return myValue; 
 }
-
 
 // Read and return the total number of processes
 int LinuxParser::TotalProcesses() 
 { 
-  return readIntFromFile(kProcStatFilename, "processes");
+  return readIntFromFile(kProcStatFilename, filterProcesses);
 }
 
 // Read and return the number of running processes
 int LinuxParser::RunningProcesses() { 
-  return readIntFromFile(kProcStatFilename, "procs_running");
+  return readIntFromFile(kProcStatFilename, filterRunningProcesses);
 }
 
 // Read and return the command associated with a process
@@ -375,6 +389,13 @@ string LinuxParser::Command(int pid ) {
   if (filestream.is_open()) {
     std::getline(filestream, line);
   }
+  filestream.close();
+  // no text longer than 40 characters
+  if (line.size()>40)
+  {
+    line.resize(40);
+    line = line + "...";
+  }
   return line; 
   }
 
@@ -382,14 +403,14 @@ string LinuxParser::Command(int pid ) {
 string LinuxParser::Ram(int pid ) 
 { 
   std::string myFolder = to_string(pid);
-  // its on kb (0.0009765625 Mb)
-  return readStringFromFile(kProcDirectory + myFolder + kStatusFilename, "VmSize:"); 
+  // using VmRSS as per reviewer suggestion
+  return readStringFromFile(kProcDirectory + myFolder + kStatusFilename, filterProcMem); 
 }
 
 // Read and return the user ID associated with a process
 string LinuxParser::Uid(int pid ) { 
   std::string myFolder = to_string(pid);  
-  return readStringFromFile(kProcDirectory + myFolder + kStatusFilename,"Uid:");
+  return readStringFromFile(kProcDirectory + myFolder + kStatusFilename,filterUID);
 }
 
 // Read and return the user associated with a process
@@ -406,11 +427,13 @@ string LinuxParser::User(int pid) {
       std::istringstream linestream(line);
       while (linestream >> key >> dummy >> value) {
         if (value == myUid) {
+          filestream.close();
           return key;
         }
       }
     }
   }
+  filestream.close();
   return key;
   }
 
@@ -418,6 +441,7 @@ string LinuxParser::User(int pid) {
 long LinuxParser::UpTime(int pid ) 
 { 
   std::string myFolder = to_string(pid);
-  // already in seconds
-  return readNumberAt(kProcDirectory + myFolder + kStatFilename, 22)/sysconf(_SC_CLK_TCK);
+  long timeSinceBoot=readNumberAt(kProcDirectory + myFolder + kStatFilename, 22);
+  long uptime = LinuxParser::UpTime() - timeSinceBoot/sysconf(_SC_CLK_TCK);
+  return uptime;
   }

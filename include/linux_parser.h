@@ -1,6 +1,9 @@
 #ifndef SYSTEM_PARSER_H
 #define SYSTEM_PARSER_H
 
+// helper debug function kindly given by the reviewer
+#define printVariableNameAndValue(x) cout<<"The name of variable **"<<(#x)<<"** and the value of variable is => "<<x<<"\n"
+
 #include <fstream>
 #include <regex>
 #include <string>
@@ -20,6 +23,18 @@ const std::string kMeminfoFilename{"/meminfo"};
 const std::string kVersionFilename{"/version"};
 const std::string kOSPath{"/etc/os-release"};
 const std::string kPasswordPath{"/etc/passwd"};
+
+// helper names
+const std::string filterProcesses("processes");
+const std::string filterRunningProcesses("procs_running");
+const std::string filterMemTotalString("MemTotal:");
+const std::string filterMemFreeString("MemFree:");
+const std::string filterCpu("cpu");
+const std::string filterUID("Uid:");
+const std::string filterProcMem("VmRSS:"); 
+const std::string filterMemAvailable("MemAvailable:");
+const std::string filterBuffers("Buffers:");
+const std::string filterCached("Cached:");
 
 // System
 float MemoryUtilization();
@@ -69,4 +84,6 @@ int readIntFromFile(const std::string myFile,const std::string myKey);
 long readNumberAt(const std::string &myFile, const int &myInt);
 // helper function to get a string  value from a string line st. myKey value
 bool getStringValue(const std::string &line, const std::string &myKey, std::string& value);
+// helper function to check string has numbers and is not empty and has no weird characters
+long getLong(const std::string& myString);
 #endif

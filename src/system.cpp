@@ -28,7 +28,7 @@ vector<Process>& System::Processes() {
     for (auto i=myPIDs.begin();i!=myPIDs.end();i++)
     {
         myProcess.setPid(*i);
-        processes_.push_back(myProcess);
+        processes_.emplace_back(myProcess);
     }
 
     // sort with cpu usage
